@@ -63,6 +63,46 @@ const Visualizations = () => {
           />
         </div>
       )}
+      {/* Hourly Histogram */}
+      <div>
+        <h2>Incident Frequency by Hour</h2>
+        <Plot
+          data={[
+            {
+              x: data.hourly_histogram.x,
+              y: data.hourly_histogram.y,
+              type: "bar",
+              marker: { color: "blue" },
+            },
+          ]}
+          layout={{
+            title: "Incident Frequency by Hour",
+            xaxis: { title: "Hour of the Day" },
+            yaxis: { title: "Number of Incidents" },
+          }}
+        />
+      </div>
+      {/* Weekly Trends Line Chart */}
+      <div>
+        <h2>Incident Trends by Day of the Week</h2>
+        <Plot
+          data={[
+            {
+              x: data.weekly_trends.x,
+              y: data.weekly_trends.y,
+              type: "scatter",
+              mode: "lines+markers",
+              marker: { color: "green" },
+            },
+          ]}
+          layout={{
+            title: "Incident Trends by Day of the Week",
+            xaxis: { title: "Day of the Week" },
+            yaxis: { title: "Number of Incidents" },
+          }}
+        />
+      </div>           
+      
     </div>
   );
 };
