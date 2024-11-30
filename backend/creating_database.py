@@ -26,5 +26,6 @@ def createdb():
     cur.execute("DROP TABLE IF EXISTS incidents;")
     cur.execute("CREATE TABLE IF NOT EXISTS incidents(incident_time TEXT, incident_number TEXT, incident_location TEXT,nature TEXT,incident_ori TEXT);")
     # print(f"table inserted")
+    con.commit()
     return con
     # cur.execute("select * from incidents")

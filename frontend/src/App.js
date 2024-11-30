@@ -1,5 +1,5 @@
 import React from "react";
-import Visualizations from "./Visualizations";
+import Visualizations from "./Visualizations"
 
 function App() {
   return (

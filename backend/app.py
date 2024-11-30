@@ -1,59 +1,138 @@
-from flask import Flask, jsonify
+from flask import Flask, request, jsonify
 from flask_cors import CORS
+import os
+import urllib.request
+from werkzeug.utils import secure_filename
 import sqlite3
 import pandas as pd
 import plotly.express as px
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import LabelEncoder
+from extractingincidents import extracting_rows, clean_data
+from creating_database import createdb
+from populatedb import populatedb
+
+UPLOAD_FOLDER = "../resources"
+ALLOWED_EXTENSIONS = {'pdf'}
 
 app = Flask(__name__)
-CORS(app) #enable cross origin resource sharing
+CORS(app)  # Enable cross-origin resource sharing
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Ensure upload directory exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 def connect_db():
     return sqlite3.connect("../resources/normanpd.db")
 
+
 def fetch_data(query):
     con = connect_db()
-    df  = pd.read_sql_query(query,con)
+    df = pd.read_sql_query(query, con)
     con.close()
     return df
+
+
 def preprocess_data(df):
     df['incident_hour'] = pd.to_datetime(df['incident_time']).dt.hour
     df['incident_date'] = pd.to_datetime(df['incident_time']).dt.date
     return df
 
+
 @app.route('/')
 def home():
-    return "Welcome to the Incident Visualizations API! Use /Visualizations to get the data."
+    return "Welcome to the Incident Visualizations API! Use /upload to upload a file or URL and /visualizations to get the data."
+
 
 @app.route('/favicon.ico')
 def favicon():
     return '', 204
 
-@app.route('/Visualizations', methods=['GET'])
-def Visualizations():
-    # Fetch data for time-series and weekly trends
-    query = "SELECT incident_time, nature FROM incidents"
-    df = fetch_data(query)
 
-    if df.empty:
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    RESOURCES_FOLDER = "../resources"  # Define the resources folder path
+
+    # Ensure the resources folder exists
+    os.makedirs(RESOURCES_FOLDER, exist_ok=True)
+
+    if 'file' in request.files:
+        file = request.files['file']
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(RESOURCES_FOLDER, filename)  # Save in the resources folder
+
+            # Check if the file exists and remove it
+            if os.path.exists(filepath):
+                os.remove(filepath)
+
+            file.save(filepath)  # Save the file
+            return handle_file(filepath)  # Process the saved file
+
+    elif 'url' in request.json:
+        url = request.json['url']
+        if url:
+            filename = "incident_report.pdf"  # Define a consistent filename for URL downloads
+            filepath = os.path.join(RESOURCES_FOLDER, filename)  # Save in the resources folder
+
+            # Check if the file exists and remove it
+            if os.path.exists(filepath):
+                os.remove(filepath)
+
+            urllib.request.urlretrieve(url, filepath)  # Download and save the file
+            return handle_file(filepath)  # Process the saved file
+
+    return jsonify({"error": "No valid file or URL provided"}), 400
+
+
+def handle_file(filepath):
+    """
+    Handles file processing: extraction, cleaning, and database population.
+    """
+    try:
+        # Extract rows from PDF
+        extracted_rows = extracting_rows(filepath)
+
+        # Clean data
+        cleaned_data = clean_data(extracted_rows)
+
+        # Create and populate database
+        con = createdb()
+        populatedb(con, cleaned_data)
+        con.close()
+
+        return jsonify({"message": "File processed and data uploaded successfully."}), 200
+
+    except Exception as e:
+        return jsonify({"error": f"An error occurred while processing the file: {str(e)}"}), 500
+
+
+@app.route('/Visualizations', methods=['GET'])
+def visualizations():
+    query1 = "SELECT incident_time, nature FROM incidents"
+    df1 = fetch_data(query1)
+
+    if df1.empty:
+        print("DataFrame df1 is empty.")
         return jsonify({"error": "No data available"}), 400
 
-    # Preprocess data
-    df['incident_time'] = pd.to_datetime(df['incident_time'], errors='coerce')
-    df = df.dropna(subset=['incident_time'])  # Remove rows with invalid timestamps
-    df['hour'] = df['incident_time'].dt.hour
-    df['day_of_week'] = df['incident_time'].dt.day_name()
+    df1['incident_time'] = pd.to_datetime(df1['incident_time'], errors='coerce')
+    df1 = df1.dropna(subset=['incident_time'])
+    df1['hour'] = df1['incident_time'].dt.hour
+    df1['day_of_week'] = df1['incident_time'].dt.day_name()
 
-    # 1. Incident Frequency by Hour (Histogram)
-    hourly_data = df['hour'].value_counts().sort_index()
+    hourly_data = df1['hour'].value_counts().sort_index()
     histogram_data = {
         "x": hourly_data.index.tolist(),
         "y": hourly_data.values.tolist(),
     }
 
-    # 2. Day of the Week Trends (Line Chart)
-    weekly_data = df['day_of_week'].value_counts().reindex(
+    weekly_data = df1['day_of_week'].value_counts().reindex(
         ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], fill_value=0
     )
     line_chart_data = {
@@ -61,53 +140,56 @@ def Visualizations():
         "y": weekly_data.values.tolist(),
     }
 
-    # Fetch data for clustering and bar graph
-    query = "SELECT incident_time, incident_location, nature FROM incidents"
-    df = fetch_data(query)
-    df = preprocess_data(df)
+    query2 = "SELECT incident_time, incident_location, nature FROM incidents"
+    df2 = fetch_data(query2)
 
-    if df.empty:
+    if df2.empty:
+        print("DataFrame df2 is empty.")
         return jsonify({"error": "No data available"}), 400
 
-    # Clustering visualization
+    df2 = preprocess_data(df2)
+
+    if df2.empty:
+        print("DataFrame df2 is empty after preprocessing.")
+        return jsonify({"error": "No data available"}), 400
+
     le = LabelEncoder()
-    df['nature_encoded'] = le.fit_transform(df['nature'].fillna("Unknown"))
-    df = df.dropna(subset=['incident_hour', 'nature_encoded'])  # Ensure valid data for clustering
+    df2['nature_encoded'] = le.fit_transform(df2['nature'].fillna("Unknown"))
+    df2 = df2.dropna(subset=['incident_hour', 'nature_encoded'])
+
+    if df2[['incident_hour', 'nature_encoded']].isna().any().any():
+        print("NaN values found in clustering data.")
+        return jsonify({"error": "Clustering data is invalid."}), 400
+
     kmeans = KMeans(n_clusters=3, random_state=0)
-    df['cluster'] = kmeans.fit_predict(df[['incident_hour', 'nature_encoded']])
-    cluster_fig = px.scatter(df, x="incident_hour", y="nature_encoded", color="cluster",
-                             title="Incident Clusters",
-                             labels={"incident_hour": "Hour of Incident", "nature_encoded": "Incident Type"})
+    df2['cluster'] = kmeans.fit_predict(df2[['incident_hour', 'nature_encoded']])
+    cluster_fig = px.scatter(
+        df2,
+        x="incident_hour",
+        y="nature_encoded",
+        color="cluster",
+        title="Incident Clusters",
+        labels={"incident_hour": "Hour of Incident", "nature_encoded": "Incident Type"}
+    )
 
-    # Bar graph visualization
-    bar_data = df['nature'].value_counts()
-    bar_fig = px.bar(x=bar_data.index, y=bar_data.values, title="Incident Type Counts",
-                     labels={"x": "Incident Type", "y": "Count"})
+    bar_data = df2['nature'].value_counts()
+    bar_fig = px.bar(
+        x=bar_data.index,
+        y=bar_data.values,
+        title="Incident Type Counts",
+        labels={"x": "Incident Type", "y": "Count"}
+    )
 
-    # # Time-series visualization
-    # df['incident_time'] = pd.to_datetime(df['incident_time'], errors='coerce')  # Convert to datetime
-    # df = df.dropna(subset=['incident_time'])  # Remove rows with invalid or missing timestamps
-
-    # df['incident_date'] = pd.to_datetime(df['incident_time']).dt.date  # Extract date only
-    # time_series_data = df.groupby('incident_date').size().reset_index(name='count')
-    # time_series_fig = px.line(
-    #     time_series_data,
-    #     x='incident_date',
-    #     y='count',
-    #     title="Incidents Over Time",
-    #     labels={"incident_date": "Date", "count": "Number of Incidents"})
-
-    # Return Visualizations as JSON
-    return jsonify({
+    response = {
         "cluster": cluster_fig.to_json(),
         "bar": bar_fig.to_json(),
-        # "time_series": time_series_fig.to_json(),
         "hourly_histogram": histogram_data,
         "weekly_trends": line_chart_data
-    })
+    }
+    # print("Response JSON:", response)
+    return jsonify(response)
+
 
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-
