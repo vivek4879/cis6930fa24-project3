@@ -7,12 +7,20 @@ const Visualizations = () => {
   const [url, setUrl] = useState(""); // Holds the URL input
   const [visualizationData, setVisualizationData] = useState(null); // Visualization data
   const [error, setError] = useState(null); // Error messages
+  const [prevData, setPrevData] = useState(null);
 
   // Handle file selection
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
     setUrl(""); // Clear URL if file is selected
   };
+
+  const refreshPage = () =>  {
+    if(visualizationData) {
+      setPrevData(visualizationData);
+      setVisualizationData(undefined);
+    }
+  }
 
   // Handle URL input
   const handleUrlChange = (e) => {
@@ -81,8 +89,18 @@ const Visualizations = () => {
   }
 
   return (
+    <>
     <div style={{ padding: "20px" }}>
       <h1>Incident visualizations</h1>
+
+      <div>
+      <button onClick={refreshPage}> Upload another file! </button>
+    </div>
+    <div>
+      <p> {
+      visualizationData.datetime
+      }</p>
+    </div>
 
       {/* Clustering Visualization */}
       {visualizationData.cluster && (
@@ -147,6 +165,7 @@ const Visualizations = () => {
         </div>
       )}
     </div>
+    </>
   );
 };
 

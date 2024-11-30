@@ -122,6 +122,11 @@ def visualizations():
         return jsonify({"error": "No data available"}), 400
 
     df1['incident_time'] = pd.to_datetime(df1['incident_time'], errors='coerce')
+    print("Hello")
+    date_time_obj = df1['incident_time'][0]
+    datetime_obj = date_time_obj.to_pydatetime()
+    date = datetime_obj.date()
+    
     df1 = df1.dropna(subset=['incident_time'])
     df1['hour'] = df1['incident_time'].dt.hour
     df1['day_of_week'] = df1['incident_time'].dt.day_name()
@@ -181,6 +186,7 @@ def visualizations():
     )
 
     response = {
+        "datetime": date,
         "cluster": cluster_fig.to_json(),
         "bar": bar_fig.to_json(),
         "hourly_histogram": histogram_data,
