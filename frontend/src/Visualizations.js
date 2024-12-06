@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import Plot from "react-plotly.js";
+import Input from "./Input.js"
 
 const Visualizations = () => {
   const [file, setFile] = useState(null); // Holds the selected file
@@ -101,6 +102,8 @@ const Visualizations = () => {
       visualizationData.datetime
       }</p>
     </div>
+
+    <Input />
 
       {/* Clustering Visualization */}
       {visualizationData.cluster && (

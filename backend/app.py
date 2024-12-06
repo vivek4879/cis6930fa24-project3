@@ -53,6 +53,11 @@ def home():
 def favicon():
     return '', 204
 
+@app.route('/feedback', methods=['POST'])
+def feedback():
+    json_data = request.get_json()
+    print("Feedback received: " + json_data["feedback"])
+    return '', 200
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
