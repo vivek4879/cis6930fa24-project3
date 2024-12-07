@@ -12,6 +12,7 @@ from extractingincidents import extracting_rows, clean_data
 from creating_database import createdb
 from populatedb import populatedb
 
+
 UPLOAD_FOLDER = "../resources"
 ALLOWED_EXTENSIONS = {'pdf'}
 
@@ -57,6 +58,9 @@ def favicon():
 def feedback():
     json_data = request.get_json()
     print("Feedback received: " + json_data["feedback"])
+    feedback = json_data["feedback"]
+    add_feedback(feedback)
+
     return '', 200
 
 @app.route('/upload', methods=['POST'])
@@ -82,10 +86,10 @@ def upload_file():
     elif 'url' in request.json:
         url = request.json['url']
         if url:
-            filename = "incident_report.pdf"  # Define a consistent filename for URL downloads
+            filename = ".pdf"  # Define a consistent filename for URL downloads
             filepath = os.path.join(RESOURCES_FOLDER, filename)  # Save in the resources folder
 
-            # Check if the file exists and remove it
+            # Check if the file exiincident_reportsts and remove it
             if os.path.exists(filepath):
                 os.remove(filepath)
 
@@ -200,6 +204,15 @@ def visualizations():
     # print("Response JSON:", response)
     return jsonify(response)
 
+def add_feedback(feedback):
+    create_query = "CREATE TABLE IF NOT EXISTS feedback(feedback TEXT);"
+    con = connect_db()
+    cur = con.execute(create_query)
+    insert_query = "INSERT INTO feedback(feedback) VALUES (?);"
+    cur.execute(insert_query, (feedback,))
+    con.commit()
+
+    print("Feedback added to db successfully")
 
 
 if __name__ == '__main__':

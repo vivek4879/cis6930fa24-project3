@@ -79,6 +79,7 @@ Access the visualizations at `http://localhost:3000`.
 2. All incident dates and times are in a recognizable format for parsing.
 3. Only NormanPD-style PDFs are supported.
 4. Data visualization is limited to the incident fields present in the database.
+5. Only one pdf uploaded at a time.
 
 ---
 ### External Resources Used
